@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ESP32 — Temp & Humidity Dashboard</title>
+    <style>
+      :root {
+        --bg: #0f1724;
+        --card: #0b1220;
+        --muted: #9aa7bd;
+        --accent: #7dd3fc; /* cyan */
+        --accent-2: #fca5a5; /* soft red */
+        --glass: rgba(255, 255, 255, 0.03);
+        --shadow: 0 8px 30px rgba(2, 6, 23, 0.7);
+        --dial-size: 320px;
+      }
+
+      * {
+        box-sizing: border-box;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+          Roboto, "Helvetica Neue", Arial;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: linear-gradient(180deg, var(--bg), #071023 140%);
+        color: #e6eef8;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wrap {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px;
+        gap: 28px;
+      }
+
+      .panel {
+        width: 100%;
+        max-width: 1100px;
+        background: linear-gradient(180deg, var(--card), rgba(8, 14, 25, 0.6));
+        border-radius: 18px;
+        padding: 28px;
+        box-shadow: var(--shadow);
+        display: flex;
+        gap: 28px;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+
+      .header {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 8px;
+      }
+
+      .title {
+        display: flex;
+        flex-direction: column;
+      }
+      .title h1 {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: 0.2px;
+      }
+      .title p {
+        margin: 2px 0 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .status {
+        font-size: 13px;
+        color: var(--muted);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .dials {
+        display: flex;
+        gap: 28px;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        flex-wrap: wrap;
+      }
+
+      /* Dial card */
+      .dial-card {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.02),
+          rgba(255, 255, 255, 0.01)
+        );
+        border-radius: 16px;
+        padding: 18px;
+        width: calc(var(--dial-size) * 0.9);
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .dial-title {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+      .dial-title .label {
+        font-size: 15px;
+      }
+      .dial-title .value-small {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      /* circle gauge */
+      .gauge {
+        width: var(--dial-size);
+        height: var(--dial-size);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: scale(0.7);
+      }
+
+      svg {
+        overflow: visible;
+      }
+
+      .center-value {
+        position: relative;
+        margin-top: -40px;
+        text-align: center;
+      }
+      .center-value .num {
+        font-size: 36px;
+        font-weight: 600;
+        letter-spacing: 0.6px;
+      }
+      .center-value .unit {
+        color: var(--muted);
+        font-size: 14px;
+        margin-top: 4px;
+      }
+
+      .note {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 6px;
+      }
+
+      /* small footer */
+      .footer {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      /* Responsive */
+      @media (max-width: 920px) {
+        .wrap {
+          padding: 18px;
+        }
+        .dials {
+          gap: 18px;
+        }
+        .dial-card {
+          width: 100%;
+        }
+        .gauge {
+          transform: scale(0.58);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="panel">
+        <div style="flex: 0 0 220px">
+          <div class="header">
+            <div class="title">
+              <h1>ESP32 DHT11 Dashboard</h1>
+              <p>Live temperature & humidity from your ESP32</p>
+            </div>
+          </div>
+          <div style="margin-top: 12px; color: var(--muted); font-size: 13px">
+            <div>
+              <strong>Last update:</strong> <span id="lastUpdate">—</span>
+            </div>
+            <div style="margin-top: 6px">
+              <strong>Device:</strong> ESP32 Devkit V1
+            </div>
+          </div>
+        </div>
+
+        <div class="dials">
+          <!-- Temperature -->
+          <div class="dial-card" id="tempCard" aria-live="polite">
+            <div class="dial-title">
+              <div class="label">Temperature</div>
+              <div class="value-small" id="tempSmall">— °C</div>
+            </div>
+
+            <div class="gauge" aria-hidden="true">
+              <svg viewBox="-120 -120 240 240" width="100%" height="100%">
+                <!-- background ring -->
+                <path
+                  d="M -100 0 A 100 100 0 1 1 100 0"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.06)"
+                  stroke-width="22"
+                  stroke-linecap="round"
+                />
+                <!-- gradient arc for temperature -->
+                <defs>
+                  <linearGradient id="tgrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#60a5fa" />
+                    <stop offset="60%" stop-color="#7dd3fc" />
+                    <stop offset="100%" stop-color="#fb7185" />
+                  </linearGradient>
+                  <filter
+                    id="glow"
+                    x="-50%"
+                    y="-50%"
+                    width="200%"
+                    height="200%"
+                  >
+                    <feGaussianBlur stdDeviation="6" result="coloredBlur" />
+                    <feMerge>
+                      <feMergeNode in="coloredBlur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                <!-- dynamic arc (stroke-dasharray controlled by JS) -->
+                <path
+                  id="tempArc"
+                  d="M -100 0 A 100 100 0 1 1 100 0"
+                  fill="none"
+                  stroke="url(#tgrad)"
+                  stroke-width="22"
+                  stroke-linecap="round"
+                  stroke-dasharray="0 628"
+                  filter="url(#glow)"
+                />
+
+                <!-- ticks -->
+                <g stroke="rgba(255,255,255,0.06)" stroke-width="2">
+                  <!-- draw marks every 10deg between -120..120 -->
+                  <!-- rendered by JS for flexibility; fallback small static marks -->
+                </g>
+
+                <!-- center circle -->
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="60"
+                  fill="rgba(0,0,0,0.25)"
+                  stroke="rgba(255,255,255,0.03)"
+                  stroke-width="1.5"
+                />
+              </svg>
+            </div>
+
+            <div class="center-value">
+              <div class="num" id="tempNum">--</div>
+              <div class="unit">°C</div>
+              <div class="note">Comfort range: 20°C — 28°C</div>
+            </div>
+          </div>
+
+          <!-- Humidity -->
+          <div class="dial-card" id="humCard" aria-live="polite">
+            <div class="dial-title">
+              <div class="label">Humidity</div>
+              <div class="value-small" id="humSmall">— %</div>
+            </div>
+
+            <div class="gauge" aria-hidden="true">
+              <svg viewBox="-120 -120 240 240" width="100%" height="100%">
+                <!-- background ring -->
+                <path
+                  d="M -100 0 A 100 100 0 1 1 100 0"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.04)"
+                  stroke-width="22"
+                  stroke-linecap="round"
+                />
+                <defs>
+                  <linearGradient id="hgrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#93c5fd" />
+                    <stop offset="100%" stop-color="#60a5fa" />
+                  </linearGradient>
+                </defs>
+
+                <path
+                  id="humArc"
+                  d="M -100 0 A 100 100 0 1 1 100 0"
+                  fill="none"
+                  stroke="url(#hgrad)"
+                  stroke-width="22"
+                  stroke-linecap="round"
+                  stroke-dasharray="0 628"
+                />
+
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="60"
+                  fill="rgba(0,0,0,0.25)"
+                  stroke="rgba(255,255,255,0.03)"
+                  stroke-width="1.5"
+                />
+              </svg>
+            </div>
+
+            <div class="center-value">
+              <div class="num" id="humNum">--</div>
+              <div class="unit">%</div>
+              <div class="note">Ideal indoor: 40% — 60%</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="width: 100%"></div>
+
+        <div class="footer">
+          <div>Polling every 5s • Data from ESP32</div>
+          <div id="raw">—</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+(function () {
+  function mapRange(x, a, b, c, d) {
+    return c + ((x - a) * (d - c)) / (b - a);
+  }
+
+  const ARC_FULL = 628.3185307179587; 
+  const SEMI = ARC_FULL / 2; 
+
+  const tempArc = document.getElementById("tempArc");
+  const humArc = document.getElementById("humArc");
+
+  const tempNum = document.getElementById("tempNum");
+  const humNum = document.getElementById("humNum");
+  const tempSmall = document.getElementById("tempSmall");
+  const humSmall = document.getElementById("humSmall");
+  const lastUpdate = document.getElementById("lastUpdate");
+  const raw = document.getElementById("raw");
+
+  const TEMP_MIN = -10;
+  const TEMP_MAX = 50;
+  const HUM_MIN = 0;
+  const HUM_MAX = 100;
+
+  function animateArc(arcEl, startPerc, endPerc, duration = 600, colorFunc = null) {
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      const curPerc = startPerc + (endPerc - startPerc) * eased;
+      const draw = Math.max(0, Math.min(1, curPerc)) * SEMI;
+      arcEl.setAttribute("stroke-dasharray", `${draw} ${ARC_FULL}`);
+
+      if (colorFunc) {
+        arcEl.setAttribute("stroke", colorFunc(curPerc));
+      }
+
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  let prevTempPerc = 0,
+    prevHumPerc = 0;
+
+  function getTempColor(temp) {
+    // Map -10°C = blue (210° hue), 50°C = red (0° hue)
+    const hue = mapRange(temp, TEMP_MIN, TEMP_MAX, 210, 0);
+    return `hsl(${hue}, 90%, 55%)`;
+  }
+
+  async function fetchAndUpdate() {
+    try {
+      const res = await fetch("/get_data", { cache: "no-store" });
+      if (!res.ok) throw new Error("Network response not ok");
+      const data = await res.json();
+
+      const temp = data.temperature ? Number(data.temperature) : null;
+      const hum = data.humidity ? Number(data.humidity) : null;
+
+      raw.innerText = `raw: ${JSON.stringify(data)}`;
+
+      if (temp !== null && !isNaN(temp)) {
+        tempNum.innerText = temp.toFixed(1);
+        tempSmall.innerText = `${temp.toFixed(1)} °C`;
+      } else {
+        tempNum.innerText = "--";
+        tempSmall.innerText = "— °C";
+      }
+
+      if (hum !== null && !isNaN(hum)) {
+        humNum.innerText = hum.toFixed(0);
+        humSmall.innerText = `${hum.toFixed(0)} %`;
+      } else {
+        humNum.innerText = "--";
+        humSmall.innerText = "— %";
+      }
+
+      const tPerc =
+        temp === null || isNaN(temp)
+          ? 0
+          : Math.max(0, Math.min(1, mapRange(temp, TEMP_MIN, TEMP_MAX, 0, 1)));
+      const hPerc =
+        hum === null || isNaN(hum)
+          ? 0
+          : Math.max(0, Math.min(1, mapRange(hum, HUM_MIN, HUM_MAX, 0, 1)));
+
+      animateArc(tempArc, prevTempPerc, tPerc, 700, () =>
+        getTempColor(temp ?? 0)
+      );
+      animateArc(humArc, prevHumPerc, hPerc, 700);
+
+      prevTempPerc = tPerc;
+      prevHumPerc = hPerc;
+
+      lastUpdate.innerText = new Date().toLocaleString();
+    } catch (err) {
+      console.error("fetch error", err);
+      raw.innerText = "error fetching data";
+    }
+  }
+
+  fetchAndUpdate();
+  setInterval(fetchAndUpdate, 5000);
+})();
+</script>
+
+    </script>
+  </body>
+</html>
