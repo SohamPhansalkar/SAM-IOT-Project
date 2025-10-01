@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SAM Project</title>
+
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link href="style.css" rel="stylesheet" />
+  </head>
+
+  <body>
+    <nav class="navbar">
+      <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1">ESP-32 : Smart Home Device</span>
+      </div>
+    </nav>
+
+    <div class="container py-5">
+      <div class="card-group d-flex flex-wrap justify-content-center">
+        <div class="card m-2">
+          <div class="card-body text-center">
+            <h5 class="card-title">Temperature</h5>
+            <h2 id="tempValue">--°C</h2>
+          </div>
+          <div class="card-footer text-center">
+            <small id="tempDesc">--</small>
+          </div>
+        </div>
+
+        <div class="card m-2">
+          <div class="card-body text-center">
+            <h5 class="card-title">Humidity</h5>
+            <h2 id="humidityValue">--%</h2>
+          </div>
+          <div class="card-footer text-center">
+            <small id="humidityDesc">--</small>
+          </div>
+        </div>
+
+        <div class="card m-2">
+          <div class="card-body text-center">
+            <h5 class="card-title">Air Quality</h5>
+            <h2 id="AQIValue">--</h2>
+          </div>
+          <div class="card-footer text-center">
+            <small id="AQIDesc">--</small>
+          </div>
+        </div>
+      </div>
+
+      <br />
+
+      <div class="card mx-auto mt-4 p-3" style="max-width: 600px">
+        <div class="card-header text-center">Wireless Connect</div>
+        <div class="card-body">
+          <label for="range4" class="form-label"
+            >Set fan trigger temperature</label
+          >
+          <input
+            type="range"
+            class="form-range"
+            min="23"
+            max="50"
+            value="27"
+            id="range4"
+          />
+          <p class="card-text mt-3">
+            Auto start the fan after the temperature goes above:
+            <output for="range4" id="rangeValue"></output>
+          </p>
+          <div class="text-center">
+            <a
+              href="#"
+              class="btn btn-outline-success mt-2"
+              onclick="manualToggle();"
+              id="toggleBtn"
+              >Manual Toggle : OFF</a
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
