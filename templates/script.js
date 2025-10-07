@@ -1,13 +1,42 @@
 console.log("JS connected");
-
-var serverURL = "http://192.168.29.119:5000";
+var serverURL = "http://10.157.126.30:5000";
 
 // Range slider
 const rangeInput = document.getElementById("range4");
 const rangeOutput = document.getElementById("rangeValue");
+const toggleBtn = document.getElementById("toggleBtn");
 
 rangeOutput.textContent = rangeInput.value;
 
+// Slider changes threshold for auto mode
+rangeInput.addEventListener("input", async function () {
+  rangeOutput.textContent = this.value;
+  await setThreshold(this.value);
+  // Reset toggle button UI when using slider
+  toggleBtn.textContent = "Turn: AUTO";
+  toggleBtn.classList.remove("btn-outline-success", "btn-outline-warning");
+  toggleBtn.classList.add("btn-outline-info");
+});
+
+// Toggle button function
+let fanOn = true; // default state
+async function toggleThreshold() {
+  fanOn = !fanOn;
+  const value = fanOn ? -1 : 100; // ON = -1, OFF = 100
+  await setThreshold(value);
+
+  if (fanOn) {
+    toggleBtn.textContent = "Turn: ON";
+    toggleBtn.classList.remove("btn-outline-warning", "btn-outline-info");
+    toggleBtn.classList.add("btn-outline-success");
+  } else {
+    toggleBtn.textContent = "Turn: OFF";
+    toggleBtn.classList.remove("btn-outline-success", "btn-outline-info");
+    toggleBtn.classList.add("btn-outline-warning");
+  }
+}
+
+// Send threshold to server
 async function setThreshold(num) {
   try {
     const response = await fetch(serverURL + "/set_threshold", {
@@ -22,36 +51,35 @@ async function setThreshold(num) {
   }
 }
 
-rangeInput.addEventListener("input", function () {
-  rangeOutput.textContent = this.value;
-  setThreshold(this.value);
-});
-
-// Manual toggle button
-async function manualToggle() {
+// Fetch sensor data
+async function fetchData() {
   try {
-    const response = await fetch(serverURL + "/manual_toggle", {
-      method: "POST",
-    });
-    const result = await response.json();
-    console.log("Manual Toggle Response:", result);
+    const response = await fetch(serverURL + "/get_data");
+    const data = await response.json();
 
-    const toggleBtn = document.getElementById("toggleBtn");
-    if (result.manual_toggle === 1) {
-      toggleBtn.textContent = "Manual Toggle : ON";
-      toggleBtn.classList.remove("btn-outline-success");
-      toggleBtn.classList.add("btn-outline-warning");
-    } else {
-      toggleBtn.textContent = "Manual Toggle : OFF";
-      toggleBtn.classList.remove("btn-outline-warning");
-      toggleBtn.classList.add("btn-outline-success");
-    }
+    document.getElementById("tempValue").textContent = data.temperature + "°C";
+    document.getElementById("humidityValue").textContent = data.humidity + "%";
+    document.getElementById("AQIValue").textContent = data.AQI;
+
+    // Optional: update descriptions if you have desc function
+    document.getElementById("tempDesc").textContent = desc(
+      data.temperature,
+      "temp"
+    );
+    document.getElementById("humidityDesc").textContent = desc(
+      data.humidity,
+      "humidity"
+    );
+    document.getElementById("AQIDesc").textContent = desc(data.AQI, "AQI");
   } catch (error) {
-    console.error("Error toggling manually:", error);
+    console.error("Error fetching data:", error);
   }
 }
 
-// Helper for descriptions
+setInterval(fetchData, 3000);
+fetchData();
+
+// Helper function for descriptions
 function desc(val, type) {
   if (type === "temp") {
     if (val < 0) return "Freezing";
@@ -75,31 +103,3 @@ function desc(val, type) {
     return "Hazardous";
   }
 }
-
-// Fetch sensor data
-async function fetchData() {
-  try {
-    const response = await fetch(serverURL + "/get_data");
-    const data = await response.json();
-
-    document.getElementById("tempValue").textContent = data.temperature + "°C";
-    document.getElementById("humidityValue").textContent = data.humidity + "%";
-    document.getElementById("AQIValue").textContent = data.AQI;
-
-    document.getElementById("tempDesc").textContent = desc(
-      data.temperature,
-      "temp"
-    );
-    document.getElementById("humidityDesc").textContent = desc(
-      data.humidity,
-      "humidity"
-    );
-    document.getElementById("AQIDesc").textContent = desc(data.AQI, "AQI");
-  } catch (error) {
-    console.error("Error fetching data:", error);
-  }
-}
-
-// Refresh every 3 seconds
-setInterval(fetchData, 3000);
-fetchData(); // Initial fetch

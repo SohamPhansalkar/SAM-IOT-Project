@@ -1,35 +1,24 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include "DHT.h"
-#include <ArduinoJson.h>  // Include ArduinoJson library for parsing JSON
+#include <ArduinoJson.h>
 
-// ---------- Pin definitions ----------
 #define DHTPIN 4
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 
-#define MQ135PIN 34    // Analog pin for air quality sensor
-#define RELAYPIN 2     // Relay to control fan
+#define MQ135PIN 34
+#define RELAYPIN 2
 
-// ---------- WiFi credentials ----------
 const char* ssid = "Pixel 6 Pro";
 const char* password = "01_ALPHA";
 
-// ---------- Flask server endpoints ----------
-const char* serverPost = "http://192.168.29.119:5000/post_data";
-const char* serverGet  = "http://192.168.29.119:5000/get_data";
-
-float threshold = 27.0;   // Default temperature threshold
-bool manualToggle = false;
+const char* serverPost = "http://10.157.126.30:5000/post_data";
 
 void setup() {
   Serial.begin(115200);
-
-  // Relay setup
   pinMode(RELAYPIN, OUTPUT);
-  digitalWrite(RELAYPIN, LOW); // Fan off initially
-
-  // Connect to WiFi
+  digitalWrite(RELAYPIN, LOW);
   WiFi.begin(ssid, password);
   Serial.println("Connecting to WiFi...");
   while (WiFi.status() != WL_CONNECTED) {
@@ -37,31 +26,26 @@ void setup() {
     Serial.print(".");
   }
   Serial.println("\nConnected to WiFi");
-
-  // Initialize DHT sensor
   dht.begin();
 }
 
 void loop() {
-  delay(5000);  // Wait 5 seconds between reads
+  delay(5000);
 
-  // --- Read sensors ---
   float temperature = dht.readTemperature();
-  float humidity    = dht.readHumidity();
-  int airAnalog     = analogRead(MQ135PIN); // 0-4095
-  String airQuality = getAQI(airAnalog);
+  float humidity = dht.readHumidity();
+  int airAnalog = analogRead(MQ135PIN);
+  int airQuality = airAnalog; // raw value for simplicity
 
   if (isnan(temperature) || isnan(humidity)) {
     Serial.println("Failed to read DHT sensor!");
     return;
   }
 
-  // --- Prepare JSON data ---
   String jsonData = "{\"temperature\": " + String(temperature) +
                     ", \"humidity\": " + String(humidity) +
                     ", \"AQI\": \"" + airQuality + "\"}";
 
-  // --- Send data to Flask server ---
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
     http.begin(serverPost);
@@ -71,30 +55,21 @@ void loop() {
 
     if (httpResponseCode > 0) {
       String response = http.getString();
-      Serial.print("Server response: ");
-      Serial.println(response);
+      Serial.println("Server response: " + response);
 
-      // --- Parse JSON response ---
       DynamicJsonDocument doc(200);
       DeserializationError error = deserializeJson(doc, response);
 
       if (!error) {
-        int toggleState = doc["toggle"] | 0; // Default 0 if not present
-
-        // --- Relay control logic ---
-        if (!manualToggle) {  // Only auto-toggle if manual not active
-          if (temperature > threshold) {
-            digitalWrite(RELAYPIN, HIGH);
-          } else {
-            digitalWrite(RELAYPIN, LOW);
-          }
+        if (doc["toggle"] == 1) {
+          digitalWrite(RELAYPIN, HIGH);
+          Serial.println("Fan: ON");
         } else {
-          // Keep relay state as per manual toggle
-          if (toggleState == 1) digitalWrite(RELAYPIN, HIGH);
-          else digitalWrite(RELAYPIN, LOW);
+          digitalWrite(RELAYPIN, LOW);
+          Serial.println("Fan: OFF");
         }
       } else {
-        Serial.println("Failed to parse JSON from server response");
+        Serial.println("Failed to parse JSON from server");
       }
 
     } else {
@@ -105,12 +80,24 @@ void loop() {
   }
 }
 
-// --- Convert MQ135 analog reading to AQI description ---
-String getAQI(int val) {
-  if (val < 1024) return "Good";
-  else if (val < 2048) return "Moderate";
-  else if (val < 3072) return "Unhealthy for Sensitive Groups";
-  else if (val < 3584) return "Unhealthy";
-  else if (val < 3840) return "Very Unhealthy";
-  else return "Hazardous";
-}
+
+// #define RELAYPIN 4  // Relay connected to D2
+
+// void setup() {
+//   Serial.begin(115200);
+//   pinMode(RELAYPIN, OUTPUT);
+//   digitalWrite(RELAYPIN, LOW);  // Start with relay OFF
+// }
+
+// void loop() {
+//   // Turn relay ON
+//   digitalWrite(RELAYPIN, HIGH);
+//   Serial.println("Relay ON");
+//   delay(2000);  // Wait 2 seconds
+
+//   // Turn relay OFF
+//   digitalWrite(RELAYPIN, LOW);
+//   Serial.println("Relay OFF");
+//   delay(2000);  // Wait 2 seconds
+// }
+
